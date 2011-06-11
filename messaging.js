@@ -20,12 +20,9 @@ var messaging = {};
     };
 
     var reply = function (reply_to, v) {
-      setTimeout(function () {
-          var on_reply = on_replies[reply_to];
-          delete on_replies[reply_to];
-          on_reply(v);
-        },
-        delay());
+      var on_reply = on_replies[reply_to];
+      delete on_replies[reply_to];
+      on_reply(v);
     };
 
     var future = function (dispatch, ev, on_reply) {
@@ -38,8 +35,12 @@ var messaging = {};
     };
 
     var future_factory = function (/* dispatch */) {
-      return function (command, arg, on_reply) {
-        future(dispatch, { command: command, arg: arg }, on_reply);
+      return function (command) {
+        var argv = Array.prototype.slice.call(arguments, 1);
+        var argc = argv.length;
+        var on_reply = (argc > 0 && typeof (argv[argc - 1] === 'function') ?
+          argv[argc - 1] : null);
+        future(dispatch, { command: command, argv: argv }, on_reply);
       }
     };
 
@@ -49,10 +50,11 @@ var messaging = {};
           if (ev.reply_to) {
 //          alert('Reply to: ' + ev.reply_to);
             future(dispatch,
-              { command: REPLY, arg: { reply_to: ev.reply_to, value: v } });
+              { command: REPLY, argv: { reply_to: ev.reply_to, value: v } });
           }
         }
-        do_handle(ev.arg, reply);
+        ev.argv.push(reply);
+        do_handle.apply(null, ev.argv);
       };
     };
 
