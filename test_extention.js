@@ -10,18 +10,20 @@ var handler = {};
     }, false));
 
 handler.alert = function (ev) {
-  alert(ev.message);
-  if (!is_injected)
-    ev.target.page.dispatchMessage('alert', 'Hello from global code.');
+  alert(ev.message[0]);
+  var n = ev.message[1];
+  if (n > 0) {
+    proxy(ev).dispatchMessage('alert',
+      [ is_injected? 'Hello from injected' : 'Hello from global', n - 1 ]);
+  }
 };
 
-function proxy() {
-  return (is_injected ?
-    safari.self.tab : safari.application.activeBrowserWindow.activeTab.page);
+function proxy(ev) {
+  return is_injected ? safari.self.tab : ev.target.page;
 }
 
 function start_injected_code() {
-  proxy().dispatchMessage('alert', 'Hello from injected code.');
+  proxy().dispatchMessage('alert', [ 'Hello from injected code.', 5 ]);
 }
 
 if (is_injected) $(start_injected_code);
