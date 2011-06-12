@@ -4,8 +4,7 @@ var handler = {};
 
 ((is_injected ? safari.self : safari.application)
   .addEventListener('message', function (ev) {
-      console.log('Received: ' +
-          JSON.stringify({ name: ev.name, message: ev.message }));
+      console.log('Received: ' + JSON.stringify(ev, [ 'name', 'message' ], 2));
         handler[ev.name](ev);
     }, false));
 
