@@ -21,6 +21,6 @@ function run2() {
   var t1 = new Date();
   future('fact', 4,
     function (v) {
-      var t2 = new Date();
-      alert('Start time: ' + t1 + '\nComplete time: ' + t2 + '\nResult: ' + v); });
+      console.log({ t1_start: t1, t2_complete: new Date() });
+    });
 }
