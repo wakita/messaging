@@ -1,7 +1,18 @@
-var debug = true;
+var debug = false;
 var messaging = {};
 
 (function () {
+    var dlog = function () {
+      if (debug) console.log.apply(console, arguments);
+    }
+
+    messaging.active_page = function () {
+      return safari.application.activeBrowserWindow.activeTab.page;
+    };
+
+    var domain =
+      typeof(safari.application) === 'undefined' ? 'injected' : 'global';
+
     var UNKNOWN = ' Unknown Message ', REPLY = ' Reply ';
     var handler = {};
     var on_replies = {};
@@ -9,65 +20,66 @@ var messaging = {};
 
     var delay = function () { return Math.floor(Math.random() * 1000); };
 
-    var dispatch = function (ev) {
-      var command = ev.command;
-      var ms = delay();
-      setTimeout(function () {
-//        alert('Dispatching [' + command + '] after ' + ms + 'ms delay');
-          (handler[command] || handler[UNKNOWN])(ev);
-        },
-        ms);
+    (domain === 'injected' ? safari.self : safari.application)
+    .addEventListener('message',
+      function (ev) {
+        dlog('Received', ev);
+        (handler[ev.name] || handler[UNKNOWN])(ev);
+      },
+      false);
+
+    var future_factory = function () {
+      var page = (domain === 'injected' ?
+        (function () { return safari.self.tab; }) :
+        messaging.active_page);
+
+      var future = function (command /* varargs */) {
+        var ev = {
+          command: command,
+          argv: Array.prototype.slice.call(arguments, 1) };
+
+        var last = ev.argv.slice(-1)[0];
+        if (typeof(last) === 'function') {
+          on_replies[ev.reply_to = ' ' + reply_id + ' '] = last;
+          reply_id++
+          ev.argv = ev.argv.slice(0, -1);
+        }
+
+        dlog('Sending message ', ev);
+        page().dispatchMessage(ev.command, ev);
+      };
+      return future;
     };
 
-    var reply = function (reply_to, v) {
-      var on_reply = on_replies[reply_to];
-      delete on_replies[reply_to];
-      on_reply(v);
-    };
-
-    var future = function (dispatch, ev, on_reply) {
-      if (on_reply) {
-        ev.reply_to = ' ' + reply_id + ' ';
-        on_replies[ev.reply_to] = on_reply;
-        reply_id++;
-      }
-      dispatch(ev);
-    };
-
-    var future_factory = function (/* dispatch */) {
-      return function (command) {
-        var argv = Array.prototype.slice.call(arguments, 1);
-        var argc = argv.length;
-        var on_reply = (argc > 0 && typeof (argv[argc - 1] === 'function') ?
-          argv[argc - 1] : null);
-        future(dispatch, { command: command, argv: argv }, on_reply);
-      }
-    };
-
-    var handle = function (command, do_handle) {
+    var install = function (command, do_handle) {
       handler[command] = function (ev) {
-        var reply = function (v) {
-          if (ev.reply_to) {
-//          alert('Reply to: ' + ev.reply_to);
-            future(dispatch,
-              { command: REPLY, argv: { reply_to: ev.reply_to, value: v } });
+        var msg = ev.message;
+        var reply_to = msg.reply_to;
+        var on_reply = function (v) {
+          if (reply_to) {
+            var page =
+              (domain === 'injected' ? safari.self.tab : ev.target.page);
+            var msg =  { command: REPLY, argv: [reply_to, v] }
+            dlog('Replying ', msg);
+            page.dispatchMessage(msg.command, msg);
           }
         }
-        ev.argv.push(reply);
-        do_handle.apply(null, ev.argv);
+        msg.argv.push(on_reply);
+        do_handle.apply(null, msg.argv);
       };
     };
 
-    handle(UNKNOWN,
-      function (name) {
-        alert('Unknown message name (' + name + ')');
+    install(UNKNOWN,
+      function (ev) { dlog('Unknown message name:', ev); });
+
+    install(REPLY, function (reply_to, v) {
+        var on_reply = on_replies[reply_to];
+        delete on_replies[reply_to];
+        on_reply(v);
       });
 
-    handle(REPLY,
-      function (info) { reply(info.reply_to, info.value); });
-
     messaging.future_factory = future_factory;
-    messaging.handle = handle;
+    messaging.install = install;
 
     if (debug) {
       messaging.handler = handler;

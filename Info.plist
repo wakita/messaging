@@ -22,7 +22,13 @@
 	<key>Content</key>
 	<dict>
 		<key>Scripts</key>
-		<dict/>
+		<dict>
+			<key>End</key>
+			<array>
+				<string>messaging.js</string>
+				<string>test_extention.js</string>
+			</array>
+		</dict>
 	</dict>
 	<key>Description</key>
 	<string>Actor-style future messaging support for Safari Extentions</string>
